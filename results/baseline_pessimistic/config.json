@@ -1,0 +1,14 @@
+{
+  "tick": 0.01,
+  "order_size": 0.001,
+  "latency_ms": 200,
+  "queue_model": "pessimistic",
+  "record_every_ms": 1000,
+  "max_position": 0.01,
+  "fees_bps": [
+    10,
+    2,
+    0,
+    -0.5
+  ]
+}
