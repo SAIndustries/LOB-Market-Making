@@ -20,7 +20,7 @@ from strategies import make_strategy
 GRID = (
     [("symmetric", {})]
     + [("imbalance", {"theta": th}) for th in (0.2, 0.4, 0.6, 0.8)]
-    + [("as", {"gamma": g}) for g in (2e-5, 5e-5, 1e-4, 2e-4)]
+    + [("as", {"gamma": g}) for g in (1e-4, 5e-4, 1e-3, 2e-3, 5e-3)]
 )
 
 
@@ -37,8 +37,9 @@ def run_one(arrays, name, params, cfg, a):
         fills[day] = res["fills"]
     df = pd.DataFrame(rows)
     out = {"strategy": label(name, params), "fills": df.fills.sum(), "volume": df.volume.sum(),
-           "gross_pnl": df.gross_pnl.sum()}
-    out["pnl_per_btc"] = out["gross_pnl"] / out["volume"] if out["volume"] else float("nan")
+           "notional": df.notional.sum(), "gross_pnl": df.gross_pnl.sum()}
+    # PnL in basis points of value traded: comparable across instruments and order sizes
+    out["pnl_bps"] = 1e4 * out["gross_pnl"] / out["notional"] if out["notional"] else float("nan")
     for f in a.fees_bps:
         out[f"net_{f:g}bps"] = df[f"net_pnl_fee_{f}bps"].sum()
     w = df.fills / df.fills.sum() if df.fills.sum() else df.fills
@@ -48,9 +49,19 @@ def run_one(arrays, name, params, cfg, a):
     return out, fills
 
 
+MIN_VOLUME_SHARE = 0.2   # a setting must trade at least 20% of the baseline's volume to be chosen
+
+
 def best(table, family):
+    """Best setting by PnL per unit of value traded (bps). Ranking by total PnL would just
+    reward trading less, since every setting loses money per unit."""
     rows = table[table.strategy.str.startswith(family + " ") | (table.strategy == family)]
-    return rows.sort_values("gross_pnl", ascending=False).iloc[0]
+    base_volume = table.loc[table.strategy == "symmetric", "volume"].iloc[0]
+    eligible = rows[rows.volume >= MIN_VOLUME_SHARE * base_volume]
+    if eligible.empty:
+        print(f"  note: no {family} setting reaches {MIN_VOLUME_SHARE:.0%} of baseline volume; using all")
+        eligible = rows
+    return eligible.sort_values("pnl_bps", ascending=False).iloc[0]
 
 
 def parse_params(lbl):

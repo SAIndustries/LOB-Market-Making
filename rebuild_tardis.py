@@ -2,10 +2,12 @@
 rebuild_book.py (standalone: no other files needed), so 01_explore.ipynb and later steps work unchanged.
 
 Install: pip install sortedcontainers pandas pyarrow
-Run:     python rebuild_tardis.py
+Run:     python rebuild_tardis.py                                   (BTCUSDT -> data/processed)
+         python rebuild_tardis.py --symbol DOGEUSDT --out data/processed_doge
 Output:  data/processed/book and data/processed/trades (replaces the live-recording output;
          run rebuild_book.py again whenever you want that back)
 """
+import argparse
 import glob
 import os
 
@@ -13,6 +15,7 @@ import pandas as pd
 from sortedcontainers import SortedDict
 
 TARDIS_DIR = "data/tardis"
+SYMBOL = "BTCUSDT"
 OUT_DIR = "data/processed"
 LEVELS = 10
 CSV_CHUNK = 2_000_000   # rows read at a time, to keep memory use low
@@ -49,7 +52,7 @@ def top(bids, asks, n):
 
 
 def rebuild_book(book_out, stats):
-    for path in sorted(glob.glob(f"{TARDIS_DIR}/*incremental_book_L2*.csv.gz")):
+    for path in sorted(glob.glob(f"{TARDIS_DIR}/*incremental_book_L2*_{SYMBOL}.csv.gz")):
         print("book:", path)
         bids, asks = SortedDict(), SortedDict()
         prev_snapshot = False
@@ -83,7 +86,7 @@ def rebuild_book(book_out, stats):
 
 
 def rebuild_trades(trade_out, stats):
-    for path in sorted(glob.glob(f"{TARDIS_DIR}/*trades*.csv.gz")):
+    for path in sorted(glob.glob(f"{TARDIS_DIR}/*trades*_{SYMBOL}.csv.gz")):
         print("trades:", path)
         cols = ["timestamp", "local_timestamp", "side", "price", "amount"]
         for chunk in pd.read_csv(path, usecols=cols, chunksize=CSV_CHUNK):
@@ -100,6 +103,12 @@ def rebuild_trades(trade_out, stats):
 
 
 def main():
+    global SYMBOL, OUT_DIR
+    p = argparse.ArgumentParser()
+    p.add_argument("--symbol", default="BTCUSDT")
+    p.add_argument("--out", default="data/processed")
+    a = p.parse_args()
+    SYMBOL, OUT_DIR = a.symbol.upper(), a.out
     stats = {"applied": 0, "snapshots": 0, "crossed": 0, "trades": 0}
     book_out, trade_out = ChunkedParquet("book"), ChunkedParquet("trades")
     rebuild_book(book_out, stats)

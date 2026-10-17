@@ -1,0 +1,10 @@
+numpy
+pandas
+pyarrow
+sortedcontainers
+websockets
+tardis-dev
+scikit-learn
+matplotlib
+pytest
+ipykernel
